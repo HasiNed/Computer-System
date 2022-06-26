@@ -1,7 +1,7 @@
 /*
  * tsh - A tiny shell program with job control
  *
- * Yunqin Zhu, PB20061372
+ * <Put your name and login ID here>
  */
 #include <ctype.h>
 #include <errno.h>
@@ -161,43 +161,7 @@ int main(int argc, char **argv) {
  * background children don't receive SIGINT (SIGTSTP) from the kernel
  * when we type ctrl-c (ctrl-z) at the keyboard.
  */
-void eval(char *cmdline) {
-  char *argv[MAXARGS]; /* argument list execve() */
-  char buf[MAXLINE];   /* holds modified command line */
-  int bg;              /* should the job run in bg or fg */
-  pid_t pid;           /* process id */
-  sigset_t mask, prev; /* signal set to block certain signals */
-
-  strcpy(buf, cmdline);
-  bg = parseline(buf, argv);
-  if (argv[0] == NULL) /* ignore empty lines */
-    return;
-
-  if (!builtin_cmd(argv)) {
-    sigemptyset(&mask);
-    sigaddset(&mask, SIGCHLD);
-    sigprocmask(SIG_BLOCK, &mask, &prev); /* block SIGCHLD */
-
-    if ((pid = fork()) == 0) {               /* child runs user job*/
-      setpgid(0, 0);                         /* set process group id */
-      sigprocmask(SIG_SETMASK, &prev, NULL); /* unblock SIGCHLD in child*/
-      if (execve(argv[0], argv, environ) < 0) {
-        fprintf(stdout, "%s: Command not found\n", argv[0]);
-        exit(1);
-      }
-    }
-
-    if (!bg) {
-      addjob(jobs, pid, FG, cmdline);
-      sigprocmask(SIG_SETMASK, &prev, NULL); /* unblock SIGCHLD */
-      waitfg(pid); /* parent waits for fg job to terminate */
-    } else {
-      addjob(jobs, pid, BG, cmdline);
-      sigprocmask(SIG_SETMASK, &prev, NULL);
-      printf("[%d] (%d) %s", pid2jid(pid), pid, cmdline);
-    }
-  }
-}
+void eval(char *cmdline) { return; }
 
 /*
  * parseline - Parse the command line and build the argv array.
@@ -257,83 +221,17 @@ int parseline(const char *cmdline, char **argv) {
  * builtin_cmd - If the user has typed a built-in command then execute
  *    it immediately.
  */
-int builtin_cmd(char **argv) {
-  if (!strcmp(argv[0], "quit")) { /* quit command */
-    exit(0);
-  }
-  if (!strcmp(argv[0], "jobs")) { /* jobs command */
-    listjobs(jobs);
-    return 1;
-  }
-  if (!strcmp(argv[0], "bg") || !strcmp(argv[0], "fg")) { /* bf & fg command */
-    do_bgfg(argv);
-    return 1;
-  }
-  return 0; /* not a builtin command */
-}
+int builtin_cmd(char **argv) { return 0; /* not a builtin command */ }
 
 /*
  * do_bgfg - Execute the builtin bg and fg commands
  */
-void do_bgfg(char **argv) {
-  struct job_t *job;
-  int jid;
-  pid_t pid;
-  char *ptr;
-
-  if (argv[1] == NULL) {
-    fprintf(stdout, "%s command requires PID or %%jobid argument\n", argv[0]);
-    return;
-  }
-
-  if (argv[1][0] == '%') { /* identify by JID */
-    for (ptr = argv[1] + 1; *ptr; ptr++) {
-      if (!isdigit(*ptr)) {
-        fprintf(stdout, "%s: argument must be a PID or %%jobid\n", argv[0]);
-        return;
-      }
-    }
-    jid = atoi(argv[1] + 1);
-    job = getjobjid(jobs, jid);
-    if (job == NULL) {
-      fprintf(stdout, "%%%d: No such job\n", jid);
-      return;
-    }
-  } else { /* identify by PID */
-    for (ptr = argv[1]; *ptr; ptr++) {
-      if (!isdigit(*ptr)) {
-        fprintf(stdout, "%s: argument must be a PID or %%jobid\n", argv[0]);
-        return;
-      }
-    }
-    pid = atoi(argv[1]);
-    job = getjobpid(jobs, pid);
-    if (job == NULL) {
-      fprintf(stdout, "(%d): No such process\n", pid);
-      return;
-    }
-  }
-
-  kill(-(job->pid), SIGCONT); /* send SIGCONT to process group */
-
-  if (!strcmp(argv[0], "fg")) {
-    job->state = FG;
-    waitfg(job->pid); /* wait for fg job to terminate */
-  } else {
-    job->state = BG;
-    printf("[%d] (%d) %s", job->jid, job->pid, job->cmdline);
-  }
-  return;
-}
+void do_bgfg(char **argv) { return; }
 
 /*
  * waitfg - Block until process pid is no longer the foreground process
  */
-void waitfg(pid_t pid) {
-  while (pid == fgpid(jobs))
-    sleep(1);
-  return;
-}
+void waitfg(pid_t pid) { return; }
 
 /*****************
  * Signal handlers
@@ -346,51 +244,21 @@ void waitfg(pid_t pid) {
  *     available zombie children, but doesn't wait for any other
  *     currently running children to terminate.
  */
-void sigchld_handler(int sig) {
-  pid_t pid;
-  int status;
-
-  while ((pid = waitpid(-1, &status, WUNTRACED | WNOHANG)) > 0) {
-    if (WIFEXITED(status)) /* terminated normaly */
-      deletejob(jobs, pid);
-    else if (WIFSIGNALED(status)) { /* terminated by signal */
-      printf("Job [%d] (%d) terminated by signal %d\n", pid2jid(pid), pid,
-             WTERMSIG(status));
-      deletejob(jobs, pid);
-    } else if (WIFSTOPPED(status)) { /* stopped by signals */
-      printf("Job [%d] (%d) stopped by signal %d\n", pid2jid(pid), pid,
-             WSTOPSIG(status));
-      getjobpid(jobs, pid)->state = ST;
-    }
-  }
-  return;
-}
+void sigchld_handler(int sig) { return; }
 
 /*
  * sigint_handler - The kernel sends a SIGINT to the shell whenver the
  *    user types ctrl-c at the keyboard.  Catch it and send it along
  *    to the foreground job.
  */
-void sigint_handler(int sig) {
-  pid_t pid = fgpid(jobs);
-
-  if (pid != 0)
-    kill(-pid, SIGINT); /* send SIGINT to foreground process group */
-  return;
-}
+void sigint_handler(int sig) { return; }
 
 /*
  * sigtstp_handler - The kernel sends a SIGTSTP to the shell whenever
  *     the user types ctrl-z at the keyboard. Catch it and suspend the
  *     foreground job by sending it a SIGTSTP.
  */
-void sigtstp_handler(int sig) {
-  pid_t pid = fgpid(jobs);
-
-  if (pid != 0)
-    kill(-pid, SIGTSTP); /* send SIGTSTP to foreground process group */
-  return;
-}
+void sigtstp_handler(int sig) { return; }
 
 /*********************
  * End signal handlers
