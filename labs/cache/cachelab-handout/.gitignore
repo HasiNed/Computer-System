@@ -6,4 +6,4 @@ test-trans
 trace.tmp
 tracegen
 trans.o
-csim.dSYM
+*.dSYM

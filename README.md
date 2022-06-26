@@ -8,3 +8,5 @@ This repository contains my lab solutions for _[Computer Systems: A Programmer's
 - 2022-03-29: Completed datalab.
 - 2022-04-25: Completed bomblab.
 - 2022-04-29: Completed attacklab.
+- 2022-05-28: Completed cachelab Part A.
+- 2022-06-26: Completed shlab.

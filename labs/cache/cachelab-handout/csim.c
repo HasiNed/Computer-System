@@ -13,7 +13,7 @@ static char *trace_file = NULL;
 
 /* Struct for cache lines */
 typedef struct cache_line {
-  int count;
+  int count; // Number of times this line has been accessed
   int valid;
   unsigned int tag;
 } cache_line_t, *cache_set_t, **cache_t;
@@ -159,7 +159,7 @@ int main(int argc, char *argv[]) {
     if (line[0] == 'I')
       continue;
 
-    /* Parse this accessMemory*/
+    /* Parse operation */
     char op;
     unsigned int addr;
     int size;
